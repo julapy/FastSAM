@@ -14,6 +14,11 @@ seaborn>=0.11.0
 
 gradio==3.35.2
 
+# LK additions
+psutil
+fastapi
+uvicorn
+
 # Ultralytics-----------------------------------
 # ultralytics == 8.0.120
 
