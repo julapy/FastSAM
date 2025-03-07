@@ -2,8 +2,10 @@ import argparse
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastsam import FastSAM, FastSAMPrompt 
+import io
 import ast
 import torch
+import traceback
 from PIL import Image
 from utils.tools import convert_box_xywh_to_xyxy
 
@@ -76,9 +78,40 @@ app = FastAPI()
 @app.on_event("startup")
 async def load_model():
     global model
+    global device
     print("Loading model...")
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )    
     model = FastSAM("./weights/FastSAM-x.pt")
     print("Model loaded.")
+
+@app.post("/segment/")
+async def segment(file: UploadFile = File(...)):
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    try:
+        image_data = await file.read()
+        image = Image.open(io.BytesIO(image_data)).convert("RGB")
+        everything_results = model(
+            image,
+            device,
+            retina_masks=True,
+            imgsz=1024,
+            conf=0.4,
+            iou=0.9    
+            )        
+        return JSONResponse(content={"success": True})
+
+    except Exception as e:
+        print("Error:", e)
+        traceback.print_exc()  # Print full error traceback to terminal
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
