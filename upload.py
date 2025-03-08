@@ -1,15 +1,12 @@
 import argparse
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
-from fastsam import FastSAM, FastSAMPrompt 
+from fastsam import FastSAM 
 import io
-import ast
 import torch
 import traceback
 import numpy as np
-import base64
 from PIL import Image
-from utils.tools import convert_box_xywh_to_xyxy
 from pycocotools import mask as mask_utils
 
 def parse_args():
@@ -96,7 +93,7 @@ async def load_model():
         if torch.backends.mps.is_available()
         else "cpu"
     )    
-    # print("device: " + device)
+    print(f"Using device: {device}")
     model = FastSAM("./weights/FastSAM-x.pt")
     print("Model loaded.")
 
@@ -162,53 +159,3 @@ async def segment(file: UploadFile = File(...)):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-# def main(args):
-#     # load model
-#     model = FastSAM(args.model_path)
-#     args.point_prompt = ast.literal_eval(args.point_prompt)
-#     args.box_prompt = convert_box_xywh_to_xyxy(ast.literal_eval(args.box_prompt))
-#     args.point_label = ast.literal_eval(args.point_label)
-#     input = Image.open(args.img_path)
-#     input = input.convert("RGB")
-#     everything_results = model(
-#         input,
-#         device=args.device,
-#         retina_masks=args.retina,
-#         imgsz=args.imgsz,
-#         conf=args.conf,
-#         iou=args.iou    
-#         )
-#     bboxes = None
-#     points = None
-#     point_label = None
-#     prompt_process = FastSAMPrompt(input, everything_results, device=args.device)
-#     if args.box_prompt[0][2] != 0 and args.box_prompt[0][3] != 0:
-#             ann = prompt_process.box_prompt(bboxes=args.box_prompt)
-#             bboxes = args.box_prompt
-#     elif args.text_prompt != None:
-#         ann = prompt_process.text_prompt(text=args.text_prompt)
-#     elif args.point_prompt[0] != [0, 0]:
-#         ann = prompt_process.point_prompt(
-#             points=args.point_prompt, pointlabel=args.point_label
-#         )
-#         points = args.point_prompt
-#         point_label = args.point_label
-#     else:
-#         ann = prompt_process.everything_prompt()
-#     prompt_process.plot(
-#         annotations=ann,
-#         output_path=args.output+args.img_path.split("/")[-1],
-#         bboxes = bboxes,
-#         points = points,
-#         point_label = point_label,
-#         withContours=args.withContours,
-#         better_quality=args.better_quality,
-#     )
-
-
-
-
-# if __name__ == "__main__":
-#     args = parse_args()
-#     main(args)
