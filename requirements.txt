@@ -18,6 +18,7 @@ gradio==3.35.2
 psutil
 fastapi
 uvicorn
+pycocotools
 
 # Ultralytics-----------------------------------
 # ultralytics == 8.0.120

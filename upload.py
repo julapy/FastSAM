@@ -6,8 +6,11 @@ import io
 import ast
 import torch
 import traceback
+import numpy as np
+import base64
 from PIL import Image
 from utils.tools import convert_box_xywh_to_xyxy
+from pycocotools import mask as mask_utils
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -75,6 +78,12 @@ def parse_args():
 
 app = FastAPI()
 
+def mask_to_coco_rle(mask):
+    """Encodes a mask into COCO RLE format."""
+    encoded = mask_utils.encode(np.asfortranarray(mask.astype(np.uint8)))
+    encoded["counts"] = encoded["counts"].decode("utf-8")  # Use ASCII format
+    return encoded
+
 @app.on_event("startup")
 async def load_model():
     global model
@@ -87,6 +96,7 @@ async def load_model():
         if torch.backends.mps.is_available()
         else "cpu"
     )    
+    # print("device: " + device)
     model = FastSAM("./weights/FastSAM-x.pt")
     print("Model loaded.")
 
@@ -98,15 +108,51 @@ async def segment(file: UploadFile = File(...)):
     try:
         image_data = await file.read()
         image = Image.open(io.BytesIO(image_data)).convert("RGB")
-        everything_results = model(
+
+        # Run FastSAM model to generate masks
+        results = model(
             image,
             device,
             retina_masks=True,
             imgsz=1024,
             conf=0.4,
             iou=0.9    
-            )        
-        return JSONResponse(content={"success": True})
+        )
+
+        # Convert results to list
+        results = list(results)
+
+        # Extract masks, bounding boxes, and confidence scores
+        masks = results[0].masks.data.cpu().numpy()  # Convert to NumPy
+        bboxes = results[0].boxes.data.cpu().numpy().tolist()  # Bounding boxes
+        predicted_ious = results[0].boxes.conf.cpu().numpy().tolist()  # Confidence scores
+        areas = [int(np.sum(mask)) for mask in masks]  # Compute mask areas
+        point_coords = [[[(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2]] for bbox in bboxes]  # Center points
+        stability_scores = predicted_ious  # Use confidence as stability score
+        crop_boxes = bboxes  # Use bbox as crop_box for now
+
+        # Convert bbox and crop_box to integers
+        bboxes = [[int(x) for x in bbox] for bbox in bboxes]
+        crop_boxes = [[int(x) for x in crop_box] for crop_box in crop_boxes]
+
+        # Encode masks in COCO RLE format
+        segmentations = [mask_to_coco_rle(mask) for mask in masks]
+
+        # Construct response matching SAM format
+        response = [
+            {
+                "segmentation": segmentations[i],
+                "area": areas[i],
+                "bbox": bboxes[i],
+                "predicted_iou": predicted_ious[i],
+                "point_coords": point_coords[i],
+                "stability_score": stability_scores[i],
+                "crop_box": crop_boxes[i]
+            }
+            for i in range(len(segmentations))
+        ]
+
+        return JSONResponse(content=response)
 
     except Exception as e:
         print("Error:", e)
