@@ -36,30 +36,27 @@ class EndpointHandler:
     def __call__(self, data):
         """
         Args:
-            data: A dictionary containing input data, expected to have either:
-                - "inputs": raw image data
-                - "parameters": optional parameters for segmentation
+            data: Either the raw image data or a dictionary containing input data
         
         Returns:
             A list of dictionaries containing segmentation results
         """
         try:
-            # Get image data
-            if "inputs" not in data:
-                return {"error": "No image provided"}
+            # Get image data with fallback pattern - if no "inputs" key, use the data itself
+            image_data = data.pop("inputs", data) if isinstance(data, dict) else data
             
-            # Get image data
-            if isinstance(data["inputs"], str):
+            # Process the image data
+            if isinstance(image_data, str):
                 # Base64 encoded image
                 import base64
-                image_bytes = base64.b64decode(data["inputs"])
+                image_bytes = base64.b64decode(image_data)
                 image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-            elif isinstance(data["inputs"], bytes):
+            elif isinstance(image_data, bytes):
                 # Raw bytes
-                image = Image.open(io.BytesIO(data["inputs"])).convert("RGB")
+                image = Image.open(io.BytesIO(image_data)).convert("RGB")
             else:
-                return {"error": "Invalid image format"}
-            
+                return {"error": f"Invalid image format - Received type: {type(image_data)}"}
+                    
             # Get parameters
             params = self.default_params.copy()
             if "parameters" in data and isinstance(data["parameters"], dict):
