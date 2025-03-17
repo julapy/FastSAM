@@ -21,3 +21,7 @@ pycocotools
 # Ultralytics-----------------------------------
 # ultralytics == 8.0.120
 
+# Hugging Face Inference Endpoint requirements
+torch>=2.0.0
+numpy>=1.22.2
+
