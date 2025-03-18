@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image
 from fastsam import FastSAM
 from pycocotools import mask as mask_utils
+from typing import Dict, List, Any
 
 class EndpointHandler:
     def __init__(self, path=""):
@@ -33,13 +34,13 @@ class EndpointHandler:
         encoded["counts"] = encoded["counts"].decode("utf-8")  # Use ASCII format
         return encoded
     
-    def __call__(self, data):
+    def __call__(self, data: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        Args:
-            data: Either the raw image data or a dictionary containing input data
-        
-        Returns:
-            A list of dictionaries containing segmentation results
+       data args:
+            inputs (:obj: `str`)
+            date (:obj: `str`)
+        Return:
+            A :obj:`list` | `dict`: will be serialized and returned
         """
         try:
             # Get image data with fallback pattern - if no "inputs" key, use the data itself
@@ -54,6 +55,9 @@ class EndpointHandler:
             elif isinstance(image_data, bytes):
                 # Raw bytes
                 image = Image.open(io.BytesIO(image_data)).convert("RGB")
+            elif isinstance(image_data, Image.Image):
+                # Direct PIL Image
+                image = image_data.convert("RGB")
             else:
                 return {"error": f"Invalid image format - Received type: {type(image_data)}"}
                     
